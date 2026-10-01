@@ -1,0 +1,24 @@
+name: Actualizar ventas de Avanter
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: avanter-import
+  cancel-in-progress: false
+jobs:
+  importar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Importar historial y actualizar últimos 90 días
+        env:
+          DASHBOARD_EMAIL: ${{ secrets.DASHBOARD_EMAIL }}
+          DASHBOARD_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
+        run: node scripts/sync.mjs
