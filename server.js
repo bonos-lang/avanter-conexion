@@ -8,7 +8,7 @@ import {createFirebase} from './lib/firebase.js';
 import {createVault} from './lib/vault.js';
 import {getSales,validateRange} from './lib/sales.js';
 const publicDir=fileURLToPath(new URL('./public/',import.meta.url));
-const files=new Map([['/',['index.html','text/html']],['/index.html',['index.html','text/html']],['/app.js',['app.js','application/javascript']],['/styles.css',['styles.css','text/css']]]);
+const files=new Map([['/',['index.html','text/html']],['/index.html',['index.html','text/html']],['/metrics.js',['metrics.js','application/javascript']],['/app.js',['app.js','application/javascript']],['/styles.css',['styles.css','text/css']]]);
 export function createApp({lookup=getLaboratories,salesLookup=getSales,intervalMs=3000,firebase=createFirebase({projectId:process.env.FIREBASE_PROJECT_ID,apiKey:process.env.FIREBASE_API_KEY,adminUid:process.env.DASHBOARD_ADMIN_UID}),vault,sessionSecret=process.env.SESSION_SECRET,encryptionKey=process.env.ENCRYPTION_KEY,secureCookies=process.env.NODE_ENV==='production'}={}) {
   vault ||= createVault({firebase,encryptionKey});
   let busy=false,nextRequestAt=0;
