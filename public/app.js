@@ -1,42 +1,26 @@
-const form = document.querySelector('#login');
-const status = document.querySelector('#status');
-const search = document.querySelector('#search');
-const rows = document.querySelector('#rows');
-let laboratories = [];
-function render() {
-  const query = search.value.trim().toLocaleLowerCase('es');
-  const filtered = laboratories.filter(l => `${l.nombre} ${l.codigo}`.toLocaleLowerCase('es').includes(query));
-  rows.replaceChildren();
-  for (const lab of filtered) {
-    const row = document.createElement('tr');
-    for (const value of [lab.nombre, lab.codigo]) { const cell = document.createElement('td'); cell.textContent = value; row.append(cell); }
-    const cell = document.createElement('td'); const badge = document.createElement('span');
-    badge.className = 'badge' + (lab.adherido ? ' yes' : ''); badge.textContent = lab.adherido ? 'Adherido' : 'Sin adherir';
-    cell.append(badge); row.append(cell); rows.append(row);
-  }
-  document.querySelector('#count').textContent = `${filtered.length} de ${laboratories.length}`;
-  if (!filtered.length && laboratories.length) { const row = document.createElement('tr'); const cell = document.createElement('td'); cell.colSpan = 3; cell.textContent = 'No hay coincidencias.'; row.append(cell); rows.append(row); }
+const $=id=>document.getElementById(id);
+let accounts=[],laboratories=[],working=false;
+async function api(path,body){
+ const response=await fetch(path,{method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),cache:'no-store',signal:AbortSignal.timeout(85000)});
+ if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('El servidor no está disponible. Volvé a probar en un momento.');
+ const data=await response.json();
+ if(!response.ok){if(response.status===401&&path!=='/api/login')showAuth();throw new Error(data.error||'No se pudo completar la operación.');}return data;
 }
-search.addEventListener('input', render);
-form.addEventListener('submit', async event => {
-  event.preventDefault();
-  const button = document.querySelector('#submit'); const password = document.querySelector('#password');
-  const body = JSON.stringify({email: document.querySelector('#email').value.trim(), password: password.value});
-  password.value = '';
-  laboratories = []; rows.replaceChildren(); search.value = ''; search.disabled = true;
-  document.querySelector('#table').hidden = true; document.querySelector('#count').textContent = 'Consultando'; document.querySelector('#updated').textContent = '';
-  button.disabled = true; document.querySelector('#results').setAttribute('aria-busy', 'true');
-  status.className = ''; status.textContent = 'Iniciando sesión y consultando Avanter…';
-  try {
-    const response = await fetch('/api/laboratorios', {method: 'POST', headers: {'Content-Type': 'application/json'}, body, cache: 'no-store', signal: AbortSignal.timeout(85000)});
-    if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('El servidor no está disponible. Esperá un momento y volvé a probar.');
-    const data = await response.json(); if (!response.ok) throw new Error(data.error || 'No se pudo consultar Avanter.');
-    if (!Array.isArray(data.laboratorios)) throw new Error('La respuesta no contiene un listado válido.');
-    laboratories = data.laboratorios; search.disabled = false; document.querySelector('#table').hidden = false; render();
-    status.textContent = `Consulta completada: ${laboratories.length} laboratorios. Se incluyen todos los estados de adhesión.`;
-    document.querySelector('#updated').textContent = `Consultado el ${new Date(data.consultadoEn).toLocaleString('es-AR')}`;
-  } catch (error) {
-    status.className = 'error'; status.textContent = error.name === 'TimeoutError' ? 'Avanter demoró demasiado. Intentá nuevamente.' : error.message;
-    document.querySelector('#count').textContent = 'Sin datos';
-  } finally { button.disabled = false; document.querySelector('#results').setAttribute('aria-busy', 'false'); }
-});
+function showAuth(){accounts=[];clearResults();$('account-form').reset();$('account-form').hidden=true;$('dashboard').hidden=true;$('logout').hidden=true;$('auth-panel').hidden=false;$('account-count').textContent='Acceso privado';}
+function clearResults(){laboratories=[];render();$('table').hidden=true;$('search').disabled=true;$('search').value='';$('updated').textContent='';$('count').textContent='Sin consultar';}
+function updateAccounts(selected){$('account').replaceChildren(new Option('Elegir una cuenta',''));for(const a of accounts)$('account').add(new Option(a.name,a.id));$('account').value=selected||'';$('account-count').textContent=`${accounts.length} de 11 cuentas`;controls();}
+function controls(){for(const id of ['consult','edit-account'])$(id).disabled=working||!$('account').value;$('new-account').disabled=working||accounts.length>=11;$('save-account').disabled=working;$('account').disabled=working;}
+async function loadAccounts(selected){accounts=(await api('/api/accounts')).accounts;updateAccounts(selected);$('auth-panel').hidden=true;$('dashboard').hidden=false;$('logout').hidden=false;}
+function render(){const query=$('search').value.trim().toLocaleLowerCase('es');const filtered=laboratories.filter(l=>`${l.nombre} ${l.codigo}`.toLocaleLowerCase('es').includes(query));$('rows').replaceChildren();for(const lab of filtered){const row=document.createElement('tr');for(const value of [lab.nombre,lab.codigo]){const cell=document.createElement('td');cell.textContent=value;row.append(cell);}const cell=document.createElement('td'),badge=document.createElement('span');badge.className='badge'+(lab.adherido?' yes':'');badge.textContent=lab.adherido?'Adherido':'Sin adherir';cell.append(badge);row.append(cell);$('rows').append(row);}$('count').textContent=`${filtered.length} de ${laboratories.length}`;}
+function display(data){laboratories=data.laboratorios;$('search').disabled=false;$('table').hidden=false;render();$('updated').textContent=`Consultado el ${new Date(data.consultadoEn).toLocaleString('es-AR')}`;}
+async function operation(action,message){working=true;controls();clearResults();$('results').setAttribute('aria-busy','true');$('status').className='';$('status').textContent=message;try{await action();}catch(error){$('status').className='error';$('status').textContent=error.name==='TimeoutError'?'La consulta demoró demasiado. Volvé a probar.':error.message;}finally{working=false;controls();$('results').setAttribute('aria-busy','false');}}
+$('auth-form').addEventListener('submit',async event=>{event.preventDefault();const body={email:$('panel-email').value.trim(),password:$('panel-password').value};$('panel-password').value='';$('auth-submit').disabled=true;$('auth-status').textContent='Ingresando…';try{await api('/api/login',body);await loadAccounts();$('auth-status').textContent='';}catch(error){$('auth-status').textContent=error.message;}finally{$('auth-submit').disabled=false;}});
+$('logout').addEventListener('click',async()=>{try{await api('/api/logout',{});showAuth();$('auth-status').textContent='Sesión cerrada.';}catch(error){$('status').textContent=error.message;}});
+$('account').addEventListener('change',()=>{clearResults();$('account-form').reset();$('email').readOnly=false;$('account-form').hidden=true;$('status').textContent='Consultá los laboratorios de la cuenta seleccionada.';controls();});
+$('new-account').addEventListener('click',()=>{$('account-form').reset();$('email').readOnly=false;$('account-form').hidden=false;$('account-name').focus();});
+$('edit-account').addEventListener('click',()=>{const a=accounts.find(a=>a.id===$('account').value);if(!a)return;$('account-form').reset();$('account-name').value=a.name;$('email').value=a.email;$('email').readOnly=true;$('account-form').hidden=false;$('password').focus();});
+$('cancel-account').addEventListener('click',()=>{$('account-form').reset();$('account-form').hidden=true;});
+$('account-form').addEventListener('submit',event=>{event.preventDefault();const body={name:$('account-name').value.trim(),email:$('email').value.trim(),password:$('password').value};$('password').value='';operation(async()=>{const data=await api('/api/accounts',body);await loadAccounts(data.account.id);$('account-form').reset();$('account-form').hidden=true;display(data);$('status').textContent=`Cuenta guardada: ${data.account.name}. Podés volver a consultarla sin ingresar su contraseña.`;},'Verificando la cuenta con Avanter…');});
+$('consult').addEventListener('click',()=>{const accountId=$('account').value;operation(async()=>{display(await api('/api/laboratorios',{accountId}));$('status').textContent=`Consulta completada: ${laboratories.length} laboratorios.`;},'Consultando Avanter con la cuenta guardada…');});
+$('search').addEventListener('input',render);
+(async()=>{try{const data=await api('/api/session');if(data.authenticated)await loadAccounts();else $('auth-status').textContent='';}catch(error){$('auth-status').textContent=error.message;}})();

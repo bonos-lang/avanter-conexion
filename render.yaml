@@ -9,3 +9,16 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 22.22.0
+      - key: NODE_ENV
+        value: production
+      - key: FIREBASE_PROJECT_ID
+        value: avanter-cuentas
+      - key: FIREBASE_API_KEY
+        value: AIzaSyDswOSAp4y3BEc784dBL0kF-twHWjyUeqw
+      - key: DASHBOARD_ADMIN_UID
+        value: 2nPAIyRIdtWHjc5FUdmgGjbi7NP2
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
+

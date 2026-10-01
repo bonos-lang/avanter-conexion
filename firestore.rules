@@ -1,0 +1,18 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /avanterVaults/{uid} {
+      function owner() {
+        return request.auth != null
+          && request.auth.uid == '2nPAIyRIdtWHjc5FUdmgGjbi7NP2'
+          && request.auth.uid == uid;
+      }
+      allow read: if owner();
+      allow create, update: if owner()
+        && request.resource.data.keys().hasOnly(['cipher'])
+        && request.resource.data.cipher is string
+        && request.resource.data.cipher.size() < 65536;
+      allow delete: if false;
+    }
+  }
+}
