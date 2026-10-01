@@ -3,9 +3,29 @@ import assert from 'node:assert/strict';
 import {createApp} from './server.js';
 import {createVault} from './lib/vault.js';
 import {seal,unseal} from './lib/security.js';
+import {AppError} from './lib/security.js';
 const key='test-only-encryption-key-1234567890',sessionKey='test-only-session-key-123456789012';
 test('cifrado rechaza alteraciones y contexto incorrecto',()=>{
  const c=seal({password:'password-test-only'},key,'vault');assert.ok(!c.includes('password-test-only'));assert.equal(unseal(c,key,'vault').password,'password-test-only');assert.throws(()=>unseal(c,key,'session'));assert.throws(()=>unseal(c,key+'wrong','vault'));assert.throws(()=>unseal(c.slice(0,-4)+'AAAA',key,'vault'));
+});
+
+test('una importación fallida conserva el mes y el historial se lee sin consultar Avanter',async()=>{
+ const firebase=storage(),docs=new Map();let fail=false,calls=0;
+ firebase.writeSnapshot=async(_,month,id,cipher)=>docs.set(month+id,{id,cipher});
+ firebase.listSnapshots=async(_,month)=>[...docs].filter(([k])=>k.startsWith(month)).map(([,v])=>v);
+ const server=createApp({firebase,encryptionKey:key,sessionSecret:sessionKey,intervalMs:0,lookup:async()=>[],salesLookup:async()=>{calls++;if(fail)throw new AppError('Fallo de prueba',502);return {sinAdhesion:false,errores:[],laboratorios:[{laboratorio:'5010',nombre:'Prueba',unidades:0,ventaBruta:0,reembolso:0,registros:0,movimientos:[],porDia:[]}]};}});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}`;let cookie='';
+ const post=(path,body)=>fetch(base+path,{method:'POST',headers:{cookie,'Content-Type':'application/json'},body:JSON.stringify(body)});
+ try{
+  assert.equal((await post('/api/history',{desde:'2025-01-01',hasta:'2025-01-31'})).status,401);
+  const login=await post('/api/login',{email:'admin@example.test',password:'test'});cookie=login.headers.get('set-cookie').split(';')[0];
+  const a=(await (await post('/api/accounts',{name:'Centro',email:'test@example.test',password:'test'})).json()).account;
+  const body={accountId:a.id,laboratorio:'5010',month:'2025-01'};
+  assert.equal((await post('/api/import',body)).status,200);const original=[...docs.values()][0].cipher;
+  fail=true;assert.equal((await post('/api/import',body)).status,502);assert.equal([...docs.values()][0].cipher,original);
+  const data=await (await post('/api/history',{accountId:'todos',laboratorio:'todos',desde:'2025-01-01',hasta:'2025-01-31'})).json();
+  assert.equal(data.snapshots,1);assert.equal(calls,2);
+ }finally{await new Promise(r=>server.close(r));}
 });
 const storage=()=>{let cipher=null,version=null;return {configured:()=>true,readVault:async()=>({cipher,version}),writeVault:async(_,value,v)=>{assert.equal(v,version);cipher=value;version='updated';},login:async()=>({uid:'admin',idToken:'test-token',refreshToken:'test-refresh',tokenExpires:Date.now()+3600000,sessionExpires:Date.now()+28800000})};};
 test('persiste y recupera tras reiniciar sin revelar password al listar',async()=>{

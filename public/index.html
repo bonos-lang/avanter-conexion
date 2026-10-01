@@ -8,8 +8,8 @@
 <form id="sales-form" class="sales-filters">
 <div><label for="sales-account">Farmacia</label><select id="sales-account"><option value="todos">Todas las cuentas</option></select></div>
 <div><label for="sales-lab">Laboratorio</label><select id="sales-lab"><option value="todos">Todos los adheridos</option></select></div>
-<div><label for="sales-from">Desde</label><input id="sales-from" type="date" required></div><div><label for="sales-to">Hasta</label><input id="sales-to" type="date" required></div><button id="sales-submit">Consultar ventas</button>
-</form><p id="sales-status" role="status" aria-live="polite">Elegí un período de hasta 93 días.</p>
+<div><label for="sales-from">Desde</label><input id="sales-from" type="date" required></div><div><label for="sales-to">Hasta</label><input id="sales-to" type="date" required></div><button id="sales-submit">Ver estadísticas</button>
+</form><button type="button" id="import-history">Importar / actualizar desde enero de 2025</button><p>La primera importación puede tardar. Si cerrás esta página, podés retomarla; los meses guardados se conservan. La tarea diaria puede completar la importación sin mantener esta página abierta.</p><p id="sales-status" role="status" aria-live="polite">Las estadísticas se leen del historial guardado.</p>
 <div id="sales-output" hidden>
 <div class="metric-grid">
 <div class="metric-card"><p>Facturado bruto calculado</p><strong id="sales-gross"></strong><small>Precio público × cantidad</small><span class="metric-icon slate">↗</span></div>

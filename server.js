@@ -6,11 +6,13 @@ import {getLaboratories,AvanterError} from './lib/avanter.js';
 import {AppError,seal,unseal} from './lib/security.js';
 import {createFirebase} from './lib/firebase.js';
 import {createVault} from './lib/vault.js';
+import {createHistory,months,today} from './lib/history.js';
 import {getSales,validateRange} from './lib/sales.js';
 const publicDir=fileURLToPath(new URL('./public/',import.meta.url));
 const files=new Map([['/',['index.html','text/html']],['/index.html',['index.html','text/html']],['/metrics.js',['metrics.js','application/javascript']],['/app.js',['app.js','application/javascript']],['/styles.css',['styles.css','text/css']]]);
 export function createApp({lookup=getLaboratories,salesLookup=getSales,intervalMs=3000,firebase=createFirebase({projectId:process.env.FIREBASE_PROJECT_ID,apiKey:process.env.FIREBASE_API_KEY,adminUid:process.env.DASHBOARD_ADMIN_UID}),vault,sessionSecret=process.env.SESSION_SECRET,encryptionKey=process.env.ENCRYPTION_KEY,secureCookies=process.env.NODE_ENV==='production'}={}) {
   vault ||= createVault({firebase,encryptionKey});
+  const history=createHistory({firebase,encryptionKey});
   let busy=false,nextRequestAt=0;
   const attempts=new Map();
   const ready=()=>firebase.configured() && sessionSecret?.length>=32 && encryptionKey?.length>=32;
@@ -24,7 +26,7 @@ export function createApp({lookup=getLaboratories,salesLookup=getSales,intervalM
     if(files.has(path) && ['GET','HEAD'].includes(req.method)) {
       try {const [name,type]=files.get(path);const content=await readFile(resolve(publicDir,name));res.writeHead(200,{'Content-Type':`${type}; charset=utf-8`});return res.end(req.method==='HEAD'?undefined:content);}catch{return json(500,{error:'No se pudo cargar la página.'});}
     }
-    const routes=new Map([['/api/session','GET'],['/api/login','POST'],['/api/logout','POST'],['/api/accounts','GET,POST'],['/api/laboratorios','POST'],['/api/ventas','POST']]);
+    const routes=new Map([['/api/session','GET'],['/api/login','POST'],['/api/logout','POST'],['/api/accounts','GET,POST'],['/api/laboratorios','POST'],['/api/ventas','POST'],['/api/history','POST'],['/api/import','POST'],['/api/import-status','POST']]);
     if(!routes.has(path)) return json(404,{error:'Ruta inexistente.'});
     if(!routes.get(path).split(',').includes(req.method)){res.setHeader('Allow',routes.get(path));return json(405,{error:'Método no permitido.'});}
     try {
@@ -64,6 +66,17 @@ export function createApp({lookup=getLaboratories,salesLookup=getSales,intervalM
       if(session.tokenExpires<=Date.now()+60000){session=await firebase.refresh(session);cookie(session);}
       if(path==='/api/session')return json(200,{authenticated:true});
       if(path==='/api/accounts' && req.method==='GET')return json(200,{accounts:await vault.list(session)});
+      if(path==='/api/import-status'){
+        months(body.month+'-01',body.month+'-01');
+        return json(200,{ids:(await firebase.listSnapshots(session,body.month)).map(d=>d.id)});
+      }
+      if(path==='/api/history')return json(200,await history.report(session,body));
+      if(path==='/api/import'){
+        const ranges=months(body.month+'-01',body.month+'-01');
+        if(ranges.length!==1)throw new AppError('Mes inválido.',400);
+        body.desde=ranges[0].desde;body.hasta=ranges[0].hasta>today()?today():ranges[0].hasta;
+        validateRange(body);if(body.laboratorio==='todos')throw new AppError('Importá un laboratorio por solicitud.',400);
+      }
       if(path==='/api/ventas'){validateRange(body);if(body.laboratorio==='todos')throw new AppError('Consultá un laboratorio por solicitud.',400);}
       if(busy || Date.now()<nextRequestAt)throw new AppError('Hay una consulta en curso. Esperá unos segundos.',429);
       busy=true;nextRequestAt=Date.now()+intervalMs;
@@ -76,6 +89,12 @@ export function createApp({lookup=getLaboratories,salesLookup=getSales,intervalM
         }
         if(typeof body.accountId!=='string'||body.accountId.length>80)throw new AppError('Elegí una cuenta guardada.',400);
         const account=await vault.get(session,body.accountId);
+        if(path==='/api/import'){
+          const data=await salesLookup(account.email,account.password,body);
+          if(data.errores.length||data.sinAdhesion||data.laboratorios.length!==1)throw new AppError('No se importó este mes: Avanter no devolvió un resultado completo. Se conservó el historial anterior.',502);
+          await history.save(session,account,{month:body.month,desde:body.desde,hasta:body.hasta},data.laboratorios[0]);
+          return json(200,{ok:true,updatedAt:new Date().toISOString()});
+        }
         if(path==='/api/ventas')return json(200,{...await salesLookup(account.email,account.password,body),consultadoEn:new Date().toISOString()});
         return json(200,{laboratorios:await lookup(account.email,account.password),consultadoEn:new Date().toISOString()});
       }finally{busy=false;}

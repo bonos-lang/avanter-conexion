@@ -9,8 +9,8 @@ async function api(path,body){
 function showAuth(){accounts=[];clearResults();$('account-form').reset();$('account-form').hidden=true;$('dashboard').hidden=true;$('logout').hidden=true;$('auth-panel').hidden=false;$('account-count').textContent='Acceso privado';$('sales-panel').hidden=true;$('sales-output').hidden=true;$('sales-labs').replaceChildren();$('sales-days').replaceChildren();$('open-prices').hidden=true;window.clearMetrics();}
 function clearResults(){laboratories=[];render();$('table').hidden=true;$('search').disabled=true;$('search').value='';$('updated').textContent='';$('count').textContent='Sin consultar';}
 function updateAccounts(selected){$('account').replaceChildren(new Option('Elegir una cuenta',''));for(const a of accounts)$('account').add(new Option(a.name,a.id));$('account').value=selected||'';$('account-count').textContent=`${accounts.length} de 11 cuentas`;controls();}
-function controls(){for(const id of ['consult','edit-account'])$(id).disabled=working||salesRunning||!$('account').value;$('new-account').disabled=working||salesRunning||accounts.length>=11;$('save-account').disabled=working||salesRunning;$('account').disabled=working||salesRunning;$('sales-submit').disabled=working||salesRunning;}
-async function loadAccounts(selected){accounts=(await api('/api/accounts')).accounts;updateAccounts(selected);$('auth-panel').hidden=true;$('dashboard').hidden=false;$('logout').hidden=false;$('sales-panel').hidden=false;updateSalesAccounts();$('open-prices').hidden=false;}
+function controls(){for(const id of ['consult','edit-account'])$(id).disabled=working||salesRunning||!$('account').value;$('new-account').disabled=working||salesRunning||accounts.length>=11;$('save-account').disabled=working||salesRunning;$('account').disabled=working||salesRunning;$('sales-submit').disabled=working||salesRunning;$('import-history').disabled=working||salesRunning;}
+async function loadAccounts(selected){accounts=(await api('/api/accounts')).accounts;updateAccounts(selected);$('auth-panel').hidden=true;$('dashboard').hidden=false;$('logout').hidden=false;$('sales-panel').hidden=false;updateSalesAccounts();$('open-prices').hidden=false;await loadHistory();}
 function render(){const query=$('search').value.trim().toLocaleLowerCase('es');const filtered=laboratories.filter(l=>`${l.nombre} ${l.codigo}`.toLocaleLowerCase('es').includes(query));$('rows').replaceChildren();for(const lab of filtered){const row=document.createElement('tr');for(const value of [lab.nombre,lab.codigo]){const cell=document.createElement('td');cell.textContent=value;row.append(cell);}const cell=document.createElement('td'),badge=document.createElement('span');badge.className='badge'+(lab.adherido?' yes':'');badge.textContent=lab.adherido?'Adherido':'Sin adherir';cell.append(badge);row.append(cell);$('rows').append(row);}$('count').textContent=`${filtered.length} de ${laboratories.length}`;}
 function display(data){laboratories=data.laboratorios;updateSalesLabs(laboratories);$('search').disabled=false;$('table').hidden=false;render();$('updated').textContent=`Consultado el ${new Date(data.consultadoEn).toLocaleString('es-AR')}`;}
 async function operation(action,message){working=true;controls();clearResults();$('results').setAttribute('aria-busy','true');$('status').className='';$('status').textContent=message;try{await action();}catch(error){$('status').className='error';$('status').textContent=error.name==='TimeoutError'?'La consulta demoró demasiado. Volvé a probar.':error.message;}finally{working=false;controls();$('results').setAttribute('aria-busy','false');}}
@@ -31,31 +31,39 @@ const money=value=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS
 function salesRow(target,values){const row=document.createElement('tr');for(const v of values){const td=document.createElement('td');td.textContent=v;row.append(td);}target.append(row);}
 function showSales(results,errors){let units=0,gross=0,refund=0;const daily=new Map();$('sales-labs').replaceChildren();$('sales-days').replaceChildren();for(const result of results){units+=result.unidades;gross+=Math.round(result.ventaBruta*100);refund+=Math.round(result.reembolso*100);salesRow($('sales-labs'),[result.farmacia,result.nombre,result.unidades,money(result.ventaBruta),money(result.reembolso)]);for(const day of result.porDia){const current=daily.get(day.fecha)||{unidades:0,ventaBruta:0};current.unidades+=day.unidades;current.ventaBruta+=Math.round(day.ventaBruta*100);daily.set(day.fecha,current);}}$('sales-units').textContent=units;$('sales-gross').textContent=money(gross/100);$('sales-refund').textContent=money(refund/100);for(const [fecha,d] of [...daily].sort((a,b)=>a[0].localeCompare(b[0])))salesRow($('sales-days'),[fecha,d.unidades,money(d.ventaBruta/100)]);$('sales-errors').textContent=errors.length?'Consulta parcial. '+errors.join(' · '):'';$('sales-output').hidden=false;window.renderMetrics(results);}
 let salesRunning=false;
-$('sales-form').addEventListener('submit',async event=>{
- event.preventDefault();if(salesRunning)return;
- const selected=$('sales-account').value,labCode=$('sales-lab').value,desde=$('sales-from').value,hasta=$('sales-to').value;
- if(desde>hasta||(Date.parse(hasta)-Date.parse(desde))/86400000>92){$('sales-status').textContent='Elegí un rango válido de hasta 93 días.';return;}
- const selectedAccounts=accounts.filter(a=>selected==='todos'||a.id===selected),results=[],errors=[];
- salesRunning=true;$('sales-submit').disabled=true;$('sales-output').hidden=true;$('consult').disabled=true;$('new-account').disabled=true;$('edit-account').disabled=true;
+async function loadHistory(){
+ $('sales-status').textContent='Leyendo el historial guardado…';
  try{
- for(const account of selectedAccounts){
-  let labs;
-  try{$('sales-status').textContent=`Buscando laboratorios de ${account.name}…`;labs=(await api('/api/laboratorios',{accountId:account.id})).laboratorios;updateSalesLabs(labs);}
-  catch(error){errors.push(`${account.name}: ${error.message}`);if($('dashboard').hidden)break;continue;}
-  const selectedLabs=labs.filter(l=>l.adherido&&(labCode==='todos'||l.codigo===labCode));
-  if(!selectedLabs.length&&labCode!=='todos')errors.push(`${account.name}: sin adhesión al laboratorio elegido.`);
-  for(const lab of selectedLabs){
-   await new Promise(resolve=>setTimeout(resolve,3100));
-   if($('dashboard').hidden)break;
-   $('sales-status').textContent=`Consultando ${account.name} · ${lab.nombre}…`;
-   try{const data=await api('/api/ventas',{accountId:account.id,laboratorio:lab.codigo,desde,hasta});results.push(...data.laboratorios.map(l=>({...l,farmacia:account.name})));errors.push(...data.errores.map(e=>`${account.name} · ${e.laboratorio}: ${e.error}`));}
-   catch(error){errors.push(`${account.name} · ${lab.nombre}: ${error.message}`);}
+  const data=await api('/api/history',{accountId:$('sales-account').value,laboratorio:$('sales-lab').value,desde:$('sales-from').value,hasta:$('sales-to').value});
+  if($('dashboard').hidden)return;
+  updateSalesLabs(data.laboratorios.map(l=>({codigo:l.laboratorio,nombre:l.nombre})));
+  showSales(data.laboratorios,[]);if(!data.snapshots)$('sales-output').hidden=true;
+  $('sales-status').textContent=data.updatedAt?'Historial guardado. Última actualización: '+new Date(data.updatedAt).toLocaleString('es-AR')+'. Datos más antiguos del período: '+new Date(data.oldestUpdate).toLocaleString('es-AR')+'.':'Todavía no hay datos importados para este período. Iniciá la importación.';
+ }catch(error){$('sales-status').textContent=error.message;}
+}
+$('sales-form').addEventListener('submit',async event=>{event.preventDefault();if(salesRunning)return;salesRunning=true;controls();try{await loadHistory();}finally{salesRunning=false;controls();}});
+$('import-history').addEventListener('click',async()=>{
+ if(salesRunning)return;salesRunning=true;controls();$('import-history').disabled=true;
+ const errors=[];let count=0;const now=formatLocal(new Date()),cutoff=new Date(Date.now()-90*86400000).toISOString().slice(0,7);
+ try{
+  for(const account of accounts){
+   await new Promise(r=>setTimeout(r,3100));
+   let labs;try{labs=(await api('/api/laboratorios',{accountId:account.id})).laboratorios.filter(l=>l.adherido);}catch(e){errors.push(account.name+': '+e.message);continue;}
+   for(let month='2025-01';month<=now.slice(0,7);){
+    const ids=new Set((await api('/api/import-status',{month})).ids);
+    for(const lab of labs){
+     if(month<cutoff&&ids.has(account.id+'_'+lab.codigo))continue;
+     if($('dashboard').hidden)throw new Error('Sesión cerrada. La importación puede retomarse.');
+     $('sales-status').textContent='Importando '+account.name+' · '+lab.nombre+' · '+month+' ('+count+' meses guardados)…';
+     await new Promise(r=>setTimeout(r,3100));
+     try{await api('/api/import',{accountId:account.id,laboratorio:lab.codigo,month});count++;}catch(e){errors.push(account.name+' · '+lab.nombre+' · '+month+': '+e.message);}
+    }
+    const d=new Date(month+'-01T00:00:00Z');d.setUTCMonth(d.getUTCMonth()+1);month=d.toISOString().slice(0,7);
+   }
   }
-  if($('dashboard').hidden)break;
-  await new Promise(resolve=>setTimeout(resolve,3100));
- }
- if(!$('dashboard').hidden){showSales(results,errors);$('sales-status').textContent=`${errors.length?'Consulta parcial':'Consulta completada'}: ${results.length} combinaciones farmacia/laboratorio. Período ${desde} al ${hasta}.`;}
- }finally{salesRunning=false;$('sales-submit').disabled=false;controls();}
+  await loadHistory();$('sales-status').textContent='Importación finalizada: '+count+' meses guardados. '+(errors.length?errors.length+' consultas fallaron. Podés retomarlas con el mismo botón.':'');$('sales-errors').textContent=errors.join(' · ');
+ }catch(e){$('sales-status').textContent=e.message;}
+ finally{salesRunning=false;$('import-history').disabled=false;controls();}
 });
 const initialDate=new Date(),formatLocal=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 $('sales-from').value=formatLocal(new Date(initialDate.getFullYear(),initialDate.getMonth()-1,1));$('sales-to').value=formatLocal(new Date(initialDate.getFullYear(),initialDate.getMonth(),0));

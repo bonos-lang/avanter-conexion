@@ -1,0 +1,48 @@
+HISTORIAL DE VENTAS DESDE ENERO DE 2025
+
+1. Descomprimir este ZIP. Subir a bonos-lang/avanter-conexion los archivos
+   y carpetas de su interior, manteniendo las rutas. Incluir .github/workflows
+   y scripts. No subir node_modules, .env ni claves privadas.
+
+2. En Firestore del proyecto avanter-cuentas, reemplazar las reglas con
+   firestore.rules y publicar. Conservan el acceso a las cuentas y agregan
+   acceso al historial únicamente al usuario administrador actual.
+
+3. En Render, Manual Deploy > Deploy latest commit.
+   No cambiar ENCRYPTION_KEY ni SESSION_SECRET.
+
+4. En GitHub: repositorio > Settings > Secrets and variables > Actions >
+   New repository secret. Crear:
+   DASHBOARD_EMAIL: el email usado para entrar al panel privado.
+   DASHBOARD_PASSWORD: la contraseña de ese panel (no la de Avanter).
+   Introducirlos únicamente en la sección Secrets; nunca en archivos.
+   La tarea necesita ese acceso privado para usar las cuentas cifradas.
+
+5. En GitHub: Actions > Actualizar ventas de Avanter > Run workflow.
+   Esto inicia la primera importación desde enero de 2025 sin tener
+   que mantener el navegador abierto. Puede tardar horas. Si se interrumpe,
+   ejecutar de nuevo: los meses históricos completos ya guardados se omiten.
+   Si faltan meses, la siguiente tarea diaria también intentará completarlos.
+
+6. La tarea queda programada todos los días a las 06:00 de Argentina
+   (09:00 UTC). GitHub puede demorar la ejecución. Refresca meses completos
+   que intersectan los últimos 90 días, hasta la fecha actual.
+   GitHub desactiva tareas programadas tras 60 días sin actividad del
+   repositorio; revisar Actions y volver a habilitarlas si ocurre.
+
+7. Abrir el panel: al entrar muestra el mes anterior desde Firestore.
+   Elegir otro período y pulsar Ver estadísticas lee solamente la base.
+   Importar / actualizar permite iniciar manualmente la misma carga
+   desde el navegador; para importaciones largas se recomienda Actions.
+
+Cada mes se reemplaza únicamente después de una respuesta completa de
+Avanter y una escritura exitosa. No se duplican ventas al repetir la carga.
+Los errores conservan los datos anteriores y hacen fallar la tarea para
+que puedan revisarse en Actions. La fecha visible corresponde al historial
+seleccionado, no garantiza que todas las cuentas hayan actualizado.
+Los laboratorios actualmente sin adhesión conservan el historial importado,
+pero Avanter puede impedir consultar sus meses antiguos.
+
+Los datos históricos no están importados todavía por preparar estos archivos.
+El funcionamiento real se valida después de desplegar y ejecutar la tarea.
+Se conservan los límites gratuitos de Firestore; controlar su uso al importar.
