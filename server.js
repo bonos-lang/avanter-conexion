@@ -6,9 +6,10 @@ import {getLaboratories,AvanterError} from './lib/avanter.js';
 import {AppError,seal,unseal} from './lib/security.js';
 import {createFirebase} from './lib/firebase.js';
 import {createVault} from './lib/vault.js';
+import {getSales,validateRange} from './lib/sales.js';
 const publicDir=fileURLToPath(new URL('./public/',import.meta.url));
 const files=new Map([['/',['index.html','text/html']],['/index.html',['index.html','text/html']],['/app.js',['app.js','application/javascript']],['/styles.css',['styles.css','text/css']]]);
-export function createApp({lookup=getLaboratories,intervalMs=3000,firebase=createFirebase({projectId:process.env.FIREBASE_PROJECT_ID,apiKey:process.env.FIREBASE_API_KEY,adminUid:process.env.DASHBOARD_ADMIN_UID}),vault,sessionSecret=process.env.SESSION_SECRET,encryptionKey=process.env.ENCRYPTION_KEY,secureCookies=process.env.NODE_ENV==='production'}={}) {
+export function createApp({lookup=getLaboratories,salesLookup=getSales,intervalMs=3000,firebase=createFirebase({projectId:process.env.FIREBASE_PROJECT_ID,apiKey:process.env.FIREBASE_API_KEY,adminUid:process.env.DASHBOARD_ADMIN_UID}),vault,sessionSecret=process.env.SESSION_SECRET,encryptionKey=process.env.ENCRYPTION_KEY,secureCookies=process.env.NODE_ENV==='production'}={}) {
   vault ||= createVault({firebase,encryptionKey});
   let busy=false,nextRequestAt=0;
   const attempts=new Map();
@@ -23,7 +24,7 @@ export function createApp({lookup=getLaboratories,intervalMs=3000,firebase=creat
     if(files.has(path) && ['GET','HEAD'].includes(req.method)) {
       try {const [name,type]=files.get(path);const content=await readFile(resolve(publicDir,name));res.writeHead(200,{'Content-Type':`${type}; charset=utf-8`});return res.end(req.method==='HEAD'?undefined:content);}catch{return json(500,{error:'No se pudo cargar la página.'});}
     }
-    const routes=new Map([['/api/session','GET'],['/api/login','POST'],['/api/logout','POST'],['/api/accounts','GET,POST'],['/api/laboratorios','POST']]);
+    const routes=new Map([['/api/session','GET'],['/api/login','POST'],['/api/logout','POST'],['/api/accounts','GET,POST'],['/api/laboratorios','POST'],['/api/ventas','POST']]);
     if(!routes.has(path)) return json(404,{error:'Ruta inexistente.'});
     if(!routes.get(path).split(',').includes(req.method)){res.setHeader('Allow',routes.get(path));return json(405,{error:'Método no permitido.'});}
     try {
@@ -63,6 +64,7 @@ export function createApp({lookup=getLaboratories,intervalMs=3000,firebase=creat
       if(session.tokenExpires<=Date.now()+60000){session=await firebase.refresh(session);cookie(session);}
       if(path==='/api/session')return json(200,{authenticated:true});
       if(path==='/api/accounts' && req.method==='GET')return json(200,{accounts:await vault.list(session)});
+      if(path==='/api/ventas'){validateRange(body);if(body.laboratorio==='todos')throw new AppError('Consultá un laboratorio por solicitud.',400);}
       if(busy || Date.now()<nextRequestAt)throw new AppError('Hay una consulta en curso. Esperá unos segundos.',429);
       busy=true;nextRequestAt=Date.now()+intervalMs;
       try {
@@ -74,6 +76,7 @@ export function createApp({lookup=getLaboratories,intervalMs=3000,firebase=creat
         }
         if(typeof body.accountId!=='string'||body.accountId.length>80)throw new AppError('Elegí una cuenta guardada.',400);
         const account=await vault.get(session,body.accountId);
+        if(path==='/api/ventas')return json(200,{...await salesLookup(account.email,account.password,body),consultadoEn:new Date().toISOString()});
         return json(200,{laboratorios:await lookup(account.email,account.password),consultadoEn:new Date().toISOString()});
       }finally{busy=false;}
     }catch(error){
@@ -86,3 +89,4 @@ export function createApp({lookup=getLaboratories,intervalMs=3000,firebase=creat
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
  const server=createApp();server.requestTimeout=90000;server.listen(Number(process.env.PORT||3000),'0.0.0.0',()=>console.log('Avanter Cuentas disponible'));
 }
+

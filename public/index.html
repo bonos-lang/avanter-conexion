@@ -23,4 +23,16 @@
 <div id="status" role="status" aria-live="polite">Elegí una cuenta guardada o agregá la primera.</div>
 <label for="search">Buscar laboratorio</label><input id="search" type="search" placeholder="Nombre o código" disabled>
 <div class="table-wrap"><table hidden id="table"><thead><tr><th>Laboratorio</th><th>Código</th><th>Adhesión</th></tr></thead><tbody id="rows"></tbody></table></div><p id="updated" class="note"></p></section>
-</div><footer>Consulta de lectura · No modifica adhesiones ni datos en Avanter.</footer></main><script src="app.js" defer></script></body></html>
+</div>
+<section class="panel sales-panel" id="sales-panel" hidden>
+<h2>Ventas por laboratorio y período</h2><p class="note">Consumos registrados en Avanter. Venta bruta calculada: precio público × cantidad. El reembolso es estimado, sujeto a aprobación del laboratorio.</p>
+<form id="sales-form" class="sales-filters">
+<div><label for="sales-account">Farmacia</label><select id="sales-account"><option value="todos">Todas las cuentas</option></select></div>
+<div><label for="sales-lab">Laboratorio</label><select id="sales-lab"><option value="todos">Todos los adheridos</option></select></div>
+<div><label for="sales-from">Desde</label><input id="sales-from" type="date" required></div><div><label for="sales-to">Hasta</label><input id="sales-to" type="date" required></div><button id="sales-submit">Consultar ventas</button>
+</form><p id="sales-status" role="status" aria-live="polite">Elegí un período de hasta 93 días.</p>
+<div id="sales-output" hidden><div class="sales-kpis"><div>Unidades <strong id="sales-units"></strong></div><div>Venta bruta calculada <strong id="sales-gross"></strong></div><div>Reembolso estimado con IVA <strong id="sales-refund"></strong></div></div>
+<h3>Por laboratorio y farmacia</h3><div class="table-wrap"><table><thead><tr><th>Farmacia</th><th>Laboratorio</th><th>Unidades</th><th>Venta bruta</th><th>Reembolso estimado</th></tr></thead><tbody id="sales-labs"></tbody></table></div>
+<h3>Evolución por día</h3><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Unidades</th><th>Venta bruta</th></tr></thead><tbody id="sales-days"></tbody></table></div><p id="sales-errors" class="error" role="status"></p>
+</div></section><footer>Consulta de lectura · No modifica adhesiones ni datos en Avanter.</footer></main><script src="app.js" defer></script></body></html>
+
