@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Prueba de conexión · Avanter</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230c675e'/%3E%3Cpath d='M7 23L16 8l9 15M11 18h10' fill='none' stroke='white' stroke-width='3'/%3E%3C/svg%3E">
+</head>
+<body>
+  <header><div class="brand">A<span>Avanter Plus</span></div><span class="tag">Prueba de conexión</span></header>
+  <main>
+    <p class="eyebrow">PRIMER PASO</p><h1>Conectá tu cuenta<br>de Avanter.</h1>
+    <p class="intro">Probá el acceso con una cuenta. Si la conexión funciona, verás todos sus laboratorios, sin filtrar por adhesión.</p>
+    <div class="layout">
+      <section class="panel"><h2>Conectar una cuenta</h2><p>Ingresá los datos de la cuenta que querés consultar.</p>
+        <form id="login">
+          <label for="email">Email de Avanter</label><input id="email" type="email" required autocomplete="username" maxlength="254" placeholder="tu@email.com">
+          <label for="password">Contraseña de Avanter</label><input id="password" type="password" required autocomplete="current-password" maxlength="1024">
+          <button id="submit" type="submit">Probar conexión <span aria-hidden="true">→</span></button>
+        </form>
+        <p class="note">La contraseña se borra del formulario al enviarla. Esta web no la guarda.</p>
+      </section>
+      <section class="panel results" aria-busy="false" id="results"><div class="section-head"><h2>Laboratorios</h2><span id="count">Sin consultar</span></div>
+        <div id="status" role="status" aria-live="polite">Conectá una cuenta para traer el listado real desde Avanter.</div>
+        <label for="search">Buscar laboratorio</label><input id="search" type="search" placeholder="Nombre o código" disabled>
+        <div class="table-wrap"><table hidden id="table"><thead><tr><th>Laboratorio</th><th>Código</th><th>Adhesión</th></tr></thead><tbody id="rows"></tbody></table></div>
+        <p id="updated" class="note"></p>
+      </section>
+    </div>
+    <footer>Consulta de lectura · No modifica adhesiones ni datos en Avanter.</footer>
+  </main><script src="app.js" defer></script>
+</body></html>

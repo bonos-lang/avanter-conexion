@@ -1,0 +1,39 @@
+AVANTER PLUS — PRUEBA PARA RENDER
+
+Una sola aplicación Node sirve la página y el endpoint de conexión a Avanter.
+No requiere Firebase, base de datos ni claves privadas del dashboard.
+Cada consulta usa el email y la contraseña ingresados, mantiene sus cookies
+solo en memoria durante esa consulta y devuelve todos los laboratorios.
+
+PROBAR LOCALMENTE
+npm ci
+npm test
+npm start
+Abrir http://localhost:3000
+
+PUBLICAR EN RENDER
+1. Crear una cuenta en https://dashboard.render.com/register
+2. Subir los archivos de esta carpeta a un repositorio de GitHub.
+   No subir node_modules, contraseñas, cookies ni archivos .env.
+3. En Render: New > Web Service. Conectar ese repositorio.
+4. Runtime: Node. Build Command: npm ci. Start Command: npm start.
+5. Elegir explícitamente el plan Free y publicar.
+   render.yaml incluye esa misma configuración y /health como health check.
+6. Abrir la URL onrender.com y probar una cuenta de Avanter.
+
+La conexión a Avanter desde Render requiere verificación con una cuenta real.
+Las pruebas del código utilizan HTML sintético y un adaptador simulado;
+no certifican que Avanter acepte conexiones desde un centro de datos.
+El parser usa la estructura y rutas observadas en el portal, no una API pública
+documentada. Ante cambios del portal puede requerir ajustes.
+No se guardan credenciales ni sesiones en disco, logs propios o navegador.
+La protección de frecuencia es básica y global en memoria, para una prueba.
+Antes de guardar 11 cuentas o compartir el acceso, incorporar usuarios y
+autorización, límites persistentes y almacenamiento seguro de secretos.
+
+Render Free suspende el servicio tras 15 minutos sin tráfico. El primer acceso
+después de la suspensión puede tardar aproximadamente un minuto.
+https://render.com/docs/free
+https://render.com/docs/deploy-node-express-app
+
+No se modificó ni eliminó aún el Hosting publicado en Firebase.
