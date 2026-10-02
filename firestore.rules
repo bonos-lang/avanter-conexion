@@ -2,7 +2,8 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /avanterSales/{uid}/months/{month}/snapshots/{snapshot} {
-      allow read: if request.auth != null && request.auth.uid == uid && uid == '2nPAIyRIdtWHjc5FUdmgGjbi7NP2';
+      allow read: if request.auth != null && uid == '2nPAIyRIdtWHjc5FUdmgGjbi7NP2'
+        && request.auth.uid in ['2nPAIyRIdtWHjc5FUdmgGjbi7NP2', 'X9ZqT6X8OogIUbO00OLybMpRtvY2'];
       allow create, update: if request.auth != null && request.auth.uid == uid && uid == '2nPAIyRIdtWHjc5FUdmgGjbi7NP2'
         && request.resource.data.keys().hasOnly(['cipher']) && request.resource.data.cipher is string && request.resource.data.cipher.size() < 900001;
       allow delete: if false;
@@ -22,3 +23,4 @@ service cloud.firestore {
     }
   }
 }
+

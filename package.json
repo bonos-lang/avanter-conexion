@@ -8,8 +8,8 @@
   },
   "scripts": {
     "start": "node server.js",
-    "test": "node lib/avanter.test.js && node lib/sales.test.js && node server.test.js && node lib/history.test.js && node lib/report-summary.test.js && node lib/commercial.test.js && node lib/firebase.test.js && node lib/chat.test.js",
-    "check": "node --check server.js && node --check lib/avanter.js && node --check public/app.js && node --check lib/history.js && node --check lib/firebase.js && node --check public/metrics.js && node --check scripts/sync.mjs && node --check public/report-utils.js && node --check public/commercial.js && node --check lib/chat.js && node --check public/chat.js"
+    "test": "node lib/avanter.test.js && node lib/sales.test.js && node server.test.js && node lib/history.test.js && node lib/report-summary.test.js && node lib/commercial.test.js && node lib/firebase.test.js && node lib/chat.test.js && node lib/prices.test.js && node lib/discounts.test.js",
+    "check": "node --check server.js && node --check lib/avanter.js && node --check public/app.js && node --check lib/history.js && node --check lib/firebase.js && node --check public/metrics.js && node --check scripts/sync.mjs && node --check public/report-utils.js && node --check public/commercial.js && node --check lib/chat.js && node --check public/chat.js && node --check lib/prices.js && node --check public/menu.js && node --check lib/discounts.js && node --check public/discounts.js"
   },
   "dependencies": {
     "cheerio": "1.0.0",

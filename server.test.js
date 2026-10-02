@@ -23,7 +23,7 @@ test('lector accede al historial del propietario pero no a credenciales ni modif
  try{const login=await post('/api/login',{email:'reader@example.test',password:'test'});cookie=login.headers.get('set-cookie').split(';')[0];
   const accounts=await (await fetch(base+'/api/accounts',{headers:{cookie}})).json();assert.equal(accounts.role,'viewer');assert.deepEqual(accounts.accounts,[{id:'one',name:'Centro'}]);assert.equal(vaultCalls,0);assert.equal((await post('/api/chat',{})).status,200);assert.equal(chatCalls,1);assert.equal((await fetch(base+'/api/chat-status',{headers:{cookie}})).status,200);
   for(const route of ['/api/accounts','/api/import','/api/import-status','/api/laboratorios','/api/ventas'])assert.equal((await post(route,{})).status,403,route);
-  const data=await (await post('/api/history',{accountId:'todos',laboratorio:'todos',desde:currentMonth+'-01',hasta:currentMonth+'-01'})).json();assert.equal(data.snapshots,1);
+  const data=await (await post('/api/history',{accountId:'todos',laboratorio:'todos',desde:currentMonth+'-01',hasta:currentMonth+'-01'})).json();assert.equal(data.snapshots,1);assert.equal((await post('/api/prices',{accountId:'todos',laboratorio:'todos',desde:currentMonth+'-01',hasta:currentMonth+'-01',search:'',offset:0})).status,200);assert.equal((await post('/api/discounts',{accountId:'todos',laboratorio:'todos',desde:currentMonth+'-01',hasta:currentMonth+'-01'})).status,200);
  }finally{await new Promise(r=>server.close(r));}
 });
 

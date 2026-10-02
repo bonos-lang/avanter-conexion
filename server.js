@@ -7,10 +7,12 @@ import {AppError,seal,unseal} from './lib/security.js';
 import {createFirebase} from './lib/firebase.js';
 import {createVault} from './lib/vault.js';
 import {createHistory,months,today} from './lib/history.js';
+import {discountHistory,validateDiscounts} from './lib/discounts.js';
+import {priceHistory,validatePrices} from './lib/prices.js';
 import {createChat} from './lib/chat.js';
 import {getSales,validateRange} from './lib/sales.js';
 const publicDir=fileURLToPath(new URL('./public/',import.meta.url));
-const files=new Map([['/',['index.html','text/html']],['/index.html',['index.html','text/html']],['/vendor/chart.umd.min.js',['vendor/chart.umd.min.js','application/javascript']],['/report-utils.js',['report-utils.js','application/javascript']],['/commercial.js',['commercial.js','application/javascript']],['/metrics.js',['metrics.js','application/javascript']],['/chat.js',['chat.js','application/javascript']],['/app.js',['app.js','application/javascript']],['/styles.css',['styles.css','text/css']]]);
+const files=new Map([['/',['index.html','text/html']],['/index.html',['index.html','text/html']],['/vendor/chart.umd.min.js',['vendor/chart.umd.min.js','application/javascript']],['/report-utils.js',['report-utils.js','application/javascript']],['/commercial.js',['commercial.js','application/javascript']],['/metrics.js',['metrics.js','application/javascript']],['/discounts.js',['discounts.js','application/javascript']],['/menu.js',['menu.js','application/javascript']],['/chat.js',['chat.js','application/javascript']],['/app.js',['app.js','application/javascript']],['/styles.css',['styles.css','text/css']]]);
 export function createApp({lookup=getLaboratories,salesLookup=getSales,intervalMs=3000,firebase=createFirebase({projectId:process.env.FIREBASE_PROJECT_ID,apiKey:process.env.FIREBASE_API_KEY,adminUid:process.env.DASHBOARD_ADMIN_UID,viewerUids:(process.env.DASHBOARD_VIEWER_UIDS||'').split(',').map(v=>v.trim())}),vault,sessionSecret=process.env.SESSION_SECRET,encryptionKey=process.env.ENCRYPTION_KEY,chat,secureCookies=process.env.NODE_ENV==='production'}={}) {
   vault ||= createVault({firebase,encryptionKey});
   const history=createHistory({firebase,encryptionKey});
@@ -28,7 +30,7 @@ export function createApp({lookup=getLaboratories,salesLookup=getSales,intervalM
     if(files.has(path) && ['GET','HEAD'].includes(req.method)) {
       try {const [name,type]=files.get(path);const content=await readFile(resolve(publicDir,name));res.writeHead(200,{'Content-Type':`${type}; charset=utf-8`});return res.end(req.method==='HEAD'?undefined:content);}catch{return json(500,{error:'No se pudo cargar la página.'});}
     }
-    const routes=new Map([['/api/session','GET'],['/api/login','POST'],['/api/logout','POST'],['/api/accounts','GET,POST'],['/api/laboratorios','POST'],['/api/ventas','POST'],['/api/history','POST'],['/api/import','POST'],['/api/import-status','POST'],['/api/chat','POST'],['/api/chat-status','GET']]);
+    const routes=new Map([['/api/session','GET'],['/api/login','POST'],['/api/logout','POST'],['/api/accounts','GET,POST'],['/api/laboratorios','POST'],['/api/ventas','POST'],['/api/history','POST'],['/api/import','POST'],['/api/import-status','POST'],['/api/chat','POST'],['/api/chat-status','GET'],['/api/prices','POST'],['/api/discounts','POST']]);
     if(!routes.has(path)) return json(404,{error:'Ruta inexistente.'});
     if(!routes.get(path).split(',').includes(req.method)){res.setHeader('Allow',routes.get(path));return json(405,{error:'Método no permitido.'});}
     try {
@@ -69,9 +71,11 @@ export function createApp({lookup=getLaboratories,salesLookup=getSales,intervalM
       session.role=firebase.roleFor?firebase.roleFor(session.uid):(session.role||'admin');
       session.storageUid=firebase.ownerUid?firebase.ownerUid(session):(session.storageUid||session.uid);
       if(path==='/api/session')return json(200,{authenticated:true,role:session.role});
-      if(session.role!=='admin'&&!['/api/history','/api/accounts','/api/chat','/api/chat-status'].includes(path))throw new AppError('Este usuario solo puede consultar el historial.',403);
+      if(session.role!=='admin'&&!['/api/history','/api/accounts','/api/chat','/api/chat-status','/api/prices','/api/discounts'].includes(path))throw new AppError('Este usuario solo puede consultar el historial.',403);
       if(session.role!=='admin'&&path==='/api/accounts'&&req.method!=='GET')throw new AppError('Este usuario no puede modificar cuentas.',403);
       if(path==='/api/accounts' && req.method==='GET')return json(200,{role:session.role,accounts:session.role==='admin'?await vault.list(session):await history.catalog(session)});
+      if(path==='/api/discounts'){validateDiscounts(body);return json(200,discountHistory(await history.report(session,{...body,aggregate:true}),body));}
+      if(path==='/api/prices'){validatePrices(body);return json(200,priceHistory(await history.report(session,{...body,aggregate:true}),body));}
       if(path==='/api/chat-status')return json(200,{configured:chat.configured()});
       if(path==='/api/chat')return json(200,await chat.ask(session,body));
       if(path==='/api/import-status'){

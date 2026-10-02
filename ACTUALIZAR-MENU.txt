@@ -1,0 +1,24 @@
+ACTUALIZAR MENU Y EVOLUCIONES
+
+1. Extraer avanter-menu-evoluciones.zip.
+2. Subir su contenido al repositorio bonos-lang/avanter-conexion respetando
+   las carpetas public, lib, scripts y .github. Reemplazar los archivos existentes.
+   Subir los archivos de la raiz directamente a la raiz del repositorio.
+3. Esperar el despliegue de Render (si el despliegue automatico esta desactivado,
+   usar Manual Deploy > Deploy latest commit).
+4. Recargar la pagina y verificar Inicio, Chatbot, Evolucion de precios,
+   Evolucion de descuentos, Resumen y Alertas.
+
+Esta version usa los datos reales guardados en Firestore. El inicio muestra
+indicadores, distribucion de descuentos e historico de seis meses. Las nuevas
+vistas se consultan al abrirlas. Gestion sigue disponible solo al administrador.
+Precios: ultimo precio observado por mes y variacion frente al mes anterior.
+Descuentos: cantidad de movimientos y participacion mensual por porcentaje,
+con filtros por laboratorio, sucursal y periodo y detalle desplegable.
+
+No hace falta cambiar las reglas de Firestore ni importar otra vez el historial.
+Conservar las variables actuales de Render, especialmente ENCRYPTION_KEY,
+SESSION_SECRET y DASHBOARD_VIEWER_UIDS. El chatbot necesita OPENAI_API_KEY
+si aun no esta configurada en Render; seguir ACTIVAR-CHATBOT.txt.
+El ZIP no contiene claves privadas, archivos .env ni datos de demostracion.
+Validacion: comprobacion de sintaxis y 31 pruebas aprobadas.

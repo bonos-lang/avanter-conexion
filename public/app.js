@@ -6,11 +6,11 @@ async function api(path,body){
  const data=await response.json();
  if(!response.ok){if(response.status===401&&path!=='/api/login')showAuth();throw new Error(data.error||'No se pudo completar la operación.');}return data;
 }
-function showAuth(){window.AvanterChat?.reset();accounts=[];clearResults();$('account-form').reset();$('account-form').hidden=true;$('dashboard').hidden=true;$('logout').hidden=true;$('auth-panel').hidden=false;$('account-count').textContent='Acceso privado';$('sales-panel').hidden=true;$('sales-output').hidden=true;$('sales-labs').replaceChildren();$('sales-days').replaceChildren();$('open-prices').hidden=true;window.clearMetrics();}
+function showAuth(){window.Menu?.reset();window.AvanterChat?.reset();accounts=[];clearResults();$('account-form').reset();$('account-form').hidden=true;$('dashboard').hidden=true;$('logout').hidden=true;$('auth-panel').hidden=false;$('account-count').textContent='Acceso privado';$('sales-panel').hidden=true;$('sales-output').hidden=true;$('sales-labs').replaceChildren();$('sales-days').replaceChildren();window.clearMetrics();}
 function clearResults(){laboratories=[];render();$('table').hidden=true;$('search').disabled=true;$('search').value='';$('updated').textContent='';$('count').textContent='Sin consultar';}
 function updateAccounts(selected){$('account').replaceChildren(new Option('Elegir una cuenta',''));for(const a of accounts)$('account').add(new Option(a.name,a.id));$('account').value=selected||'';$('account-count').textContent=userRole==='admin'?`${accounts.length} de 11 cuentas`:`Solo lectura · ${accounts.length} farmacias`;controls();}
-function controls(){for(const id of ['sales-account','sales-lab','sales-period','sales-from','sales-to','compare-mode','compare-month'])$(id).disabled=working||salesRunning;for(const id of ['consult','edit-account'])$(id).disabled=working||salesRunning||!$('account').value;$('new-account').disabled=working||salesRunning||accounts.length>=11;$('save-account').disabled=working||salesRunning;$('account').disabled=working||salesRunning;$('sales-submit').disabled=working||salesRunning;$('import-history').disabled=working||salesRunning;}
-async function loadAccounts(selected){const data=await api('/api/accounts');accounts=data.accounts;userRole=data.role||'admin';updateAccounts(selected);$('auth-panel').hidden=true;$('dashboard').hidden=userRole!=='admin';$('maintenance').hidden=userRole!=='admin';$('logout').hidden=false;$('sales-panel').hidden=false;window.AvanterChat?.show();updateSalesAccounts();$('open-prices').hidden=false;await loadHistory();}
+function controls(){for(const b of document.querySelectorAll('[data-view]'))b.disabled=working||salesRunning;for(const id of ['sales-account','sales-lab','sales-period','sales-from','sales-to','compare-mode','compare-month'])$(id).disabled=working||salesRunning;for(const id of ['consult','edit-account'])$(id).disabled=working||salesRunning||!$('account').value;$('new-account').disabled=working||salesRunning||accounts.length>=11;$('save-account').disabled=working||salesRunning;$('account').disabled=working||salesRunning;$('sales-submit').disabled=working||salesRunning;$('import-history').disabled=working||salesRunning;}
+async function loadAccounts(selected){const data=await api('/api/accounts');accounts=data.accounts;userRole=data.role||'admin';updateAccounts(selected);$('auth-panel').hidden=true;$('dashboard').hidden=userRole!=='admin';$('maintenance').hidden=userRole!=='admin';$('logout').hidden=false;$('sales-panel').hidden=false;updateSalesAccounts();window.Menu?.ready();await loadHistory();}
 function render(){const query=$('search').value.trim().toLocaleLowerCase('es');const filtered=laboratories.filter(l=>`${l.nombre} ${l.codigo}`.toLocaleLowerCase('es').includes(query));$('rows').replaceChildren();for(const lab of filtered){const row=document.createElement('tr');for(const value of [lab.nombre,lab.codigo]){const cell=document.createElement('td');cell.textContent=value;row.append(cell);}const cell=document.createElement('td'),badge=document.createElement('span');badge.className='badge'+(lab.adherido?' yes':'');badge.textContent=lab.adherido?'Adherido':'Sin adherir';cell.append(badge);row.append(cell);$('rows').append(row);}$('count').textContent=`${filtered.length} de ${laboratories.length}`;}
 function display(data){laboratories=data.laboratorios;updateSalesLabs(laboratories);$('search').disabled=false;$('table').hidden=false;render();$('updated').textContent=`Consultado el ${new Date(data.consultadoEn).toLocaleString('es-AR')}`;}
 async function operation(action,message){working=true;controls();clearResults();$('results').setAttribute('aria-busy','true');$('status').className='';$('status').textContent=message;try{await action();}catch(error){$('status').className='error';$('status').textContent=error.name==='TimeoutError'?'La consulta demoró demasiado. Volvé a probar.':error.message;}finally{working=false;controls();$('results').setAttribute('aria-busy','false');}}
@@ -29,7 +29,7 @@ function updateSalesAccounts(){const selected=$('sales-account').value;$('sales-
 function updateSalesLabs(labs){const selected=$('sales-lab').value,existing=new Map(Array.from($('sales-lab').options).filter(o=>o.value!=='todos').map(o=>[o.value,o.text]));for(const lab of labs)existing.set(lab.codigo,lab.nombre);$('sales-lab').replaceChildren(new Option('Todos los laboratorios','todos'));for(const [code,name] of [...existing].sort((a,b)=>a[1].localeCompare(b[1],'es')))$('sales-lab').add(new Option(name,code));$('sales-lab').value=existing.has(selected)?selected:'todos';}
 const money=value=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS'}).format(value);
 function salesRow(target,values){const row=document.createElement('tr');for(const v of values){const td=document.createElement('td');td.textContent=v;row.append(td);}target.append(row);}
-function showSales(results,errors){let units=0,gross=0,refund=0;const daily=new Map();$('sales-labs').replaceChildren();$('sales-days').replaceChildren();for(const result of results){units+=result.unidades;gross+=Math.round(result.ventaBruta*100);refund+=Math.round(result.reembolso*100);salesRow($('sales-labs'),[result.farmacia,result.nombre,result.unidades,money(result.ventaBruta),money(result.reembolso)]);for(const day of result.porDia){const current=daily.get(day.fecha)||{unidades:0,ventaBruta:0};current.unidades+=day.unidades;current.ventaBruta+=Math.round(day.ventaBruta*100);daily.set(day.fecha,current);}}$('sales-units').textContent=units;$('sales-gross').textContent=money(gross/100);$('sales-refund').textContent=money(refund/100);for(const [fecha,d] of [...daily].sort((a,b)=>a[0].localeCompare(b[0])))salesRow($('sales-days'),[fecha,d.unidades,money(d.ventaBruta/100)]);$('sales-errors').textContent=errors.length?'Consulta parcial. '+errors.join(' · '):'';$('sales-output').hidden=false;window.renderMetrics(results);}
+function showSales(results,errors){const gross=results.reduce((s,r)=>s+Math.round(r.ventaBruta*100),0),refund=results.reduce((s,r)=>s+Math.round(r.reembolso*100),0);$('sales-units').textContent=results.reduce((s,r)=>s+r.unidades,0);$('sales-gross').textContent=money(gross/100);$('sales-refund').textContent=money(refund/100);$('sales-errors').textContent=errors.join(' · ');$('sales-output').hidden=false;window.renderMetrics(results,{summary:window.Menu?.view()==='summary'});}
 let salesRunning=false;
 async function loadHistory(){
  applyPeriod();
@@ -38,11 +38,14 @@ async function loadHistory(){
  $('sales-output').hidden=true;
  $('sales-status').textContent='Leyendo el historial guardado…';
  try{
-  const data=await api('/api/history',{accountId:$('sales-account').value,laboratorio:$('sales-lab').value,desde:$('sales-from').value,hasta:$('sales-to').value,aggregate:$('sales-period').value==='todos'});
+  const data=await api('/api/history',{accountId:$('sales-account').value,laboratorio:$('sales-lab').value,desde:$('sales-from').value,hasta:$('sales-to').value,aggregate:true});
   if($('sales-panel').hidden)return;
   updateSalesLabs(data.laboratorios.map(l=>({codigo:l.laboratorio,nombre:l.nombre})));
   showSales(data.laboratorios,[]);if(!data.snapshots)$('sales-output').hidden=true;
-  await loadComparison();
+  window.Menu?.invalidate();
+  if(window.Menu?.view()==='alerts')await loadComparison();
+  if(window.Menu?.view()==='home')await window.Menu.loadEvolution();
+  if(window.Menu?.view()==='summary')window.Menu.renderDetail();
   $('sales-status').textContent=data.updatedAt?'Historial guardado. Última actualización: '+new Date(data.updatedAt).toLocaleString('es-AR')+'. Datos más antiguos del período: '+new Date(data.oldestUpdate).toLocaleString('es-AR')+'.':'Todavía no hay datos importados para este período. Iniciá la importación.';
  }catch(error){$('sales-status').textContent=error.message;}
 }
@@ -111,5 +114,5 @@ async function loadComparison(){
  window.renderComparison(data.laboratorios,currentLabel,previousLabel,equalDuration);
  }catch(error){$('comparison-status').textContent='No se pudo cargar la referencia: '+error.message;}
 }
-$('compare-mode').addEventListener('change',()=>{$('compare-month-wrap').hidden=$('compare-mode').value!=='month';if(!salesRunning)$('sales-form').requestSubmit();});
-$('compare-month').addEventListener('change',()=>{if(!salesRunning)$('sales-form').requestSubmit();});
+$('compare-mode').addEventListener('change',()=>{$('compare-month-wrap').hidden=$('compare-mode').value!=='month';window.clearComparison();loadComparison();});
+$('compare-month').addEventListener('change',()=>{window.clearComparison();loadComparison();});
