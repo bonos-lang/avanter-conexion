@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /avanterSales/{uid}/months/{month}/snapshots/{snapshot} {
+      allow read: if request.auth != null && uid == '2nPAIyRIdtWHjc5FUdmgGjbi7NP2'
+        && request.auth.uid in ['2nPAIyRIdtWHjc5FUdmgGjbi7NP2', 'REEMPLAZAR_UID_LECTOR'];
+      allow create, update: if request.auth != null && request.auth.uid == uid && uid == '2nPAIyRIdtWHjc5FUdmgGjbi7NP2'
+        && request.resource.data.keys().hasOnly(['cipher']) && request.resource.data.cipher is string && request.resource.data.cipher.size() < 900001;
+      allow delete: if false;
+    }
+    match /avanterVaults/{uid} {
+      function owner() {
+        return request.auth != null
+          && request.auth.uid == '2nPAIyRIdtWHjc5FUdmgGjbi7NP2'
+          && request.auth.uid == uid;
+      }
+      allow read: if owner();
+      allow create, update: if owner()
+        && request.resource.data.keys().hasOnly(['cipher'])
+        && request.resource.data.cipher is string
+        && request.resource.data.cipher.size() < 65536;
+      allow delete: if false;
+    }
+  }
+}

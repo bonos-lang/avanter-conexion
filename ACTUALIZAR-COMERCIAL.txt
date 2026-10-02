@@ -1,0 +1,43 @@
+ACTUALIZACION COMERCIAL Y USUARIO LECTOR
+
+1. Subir el contenido del ZIP a bonos-lang/avanter-conexion, respetando
+   las carpetas public, lib y scripts. Render > Manual Deploy > Deploy
+   latest commit. La tarea diaria y el historial existente siguen sirviendo.
+
+2. Para crear el lector mrl@riadigos.com.ar:
+   Firebase > Avanter Cuentas > Authentication > Usuarios > Agregar usuario.
+   Elegir la contraseña directamente en Firebase. Copiar el UID resultante.
+
+3. En Render > Environment, agregar DASHBOARD_VIEWER_UIDS con ese UID.
+   Para varios lectores se separan sus UID con comas. No usar emails aquí.
+   No cambiar DASHBOARD_ADMIN_UID ni ENCRYPTION_KEY ni SESSION_SECRET.
+
+4. En firestore-lector.rules, reemplazar REEMPLAZAR_UID_LECTOR por ese UID.
+   Revisar y publicar esas reglas en Firestore. Solamente el administrador
+   actual puede escribir; el lector accede al historial, sin acceso al vault.
+   La plantilla por sí sola todavía no habilita ningún lector real.
+
+5. Verificar con mrl@riadigos.com.ar en una ventana privada: estadísticas,
+   comparaciones y alertas disponibles; gestión y sincronización ocultas.
+   Las API rechazan modificaciones, importaciones y consultas de credenciales
+   para lectores, aunque se intenten invocar sin usar los controles visibles.
+
+CAMBIOS
+Columnas numéricas alineadas a la derecha. Gráficos de igual altura.
+Detalle de descuentos desplegable: ambos paneles conservan igual altura.
+Comparación predeterminada contra el mismo período del año anterior;
+se puede elegir otro mes o desactivar la comparación.
+Sin referencia importada, se muestra un aviso; no se inventan valores.
+
+ALERTAS
+Caídas de 10% o más en unidades, modificables desde el panel.
+Productos: mínimo previo de 10 unidades. Laboratorios: mínimo de 20.
+Se usan combinaciones de farmacia/laboratorio con datos en ambos períodos.
+Se advierte sobre cobertura parcial. Períodos de distinta duración no generan
+oportunidades; se admiten meses completos aunque tengan diferente número de días.
+Se muestran hasta 12 señales ordenadas por unidades perdidas.
+Las señales no se envían por email ni crean ofertas automáticamente.
+Para definir precios y márgenes se requieren stock y costos externos.
+
+Verificado con datos ficticios y 23 pruebas automáticas. Falta comprobar el
+usuario real y la configuración de sus permisos después del alta y despliegue.

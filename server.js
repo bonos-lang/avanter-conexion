@@ -9,8 +9,8 @@ import {createVault} from './lib/vault.js';
 import {createHistory,months,today} from './lib/history.js';
 import {getSales,validateRange} from './lib/sales.js';
 const publicDir=fileURLToPath(new URL('./public/',import.meta.url));
-const files=new Map([['/',['index.html','text/html']],['/index.html',['index.html','text/html']],['/vendor/chart.umd.min.js',['vendor/chart.umd.min.js','application/javascript']],['/report-utils.js',['report-utils.js','application/javascript']],['/metrics.js',['metrics.js','application/javascript']],['/app.js',['app.js','application/javascript']],['/styles.css',['styles.css','text/css']]]);
-export function createApp({lookup=getLaboratories,salesLookup=getSales,intervalMs=3000,firebase=createFirebase({projectId:process.env.FIREBASE_PROJECT_ID,apiKey:process.env.FIREBASE_API_KEY,adminUid:process.env.DASHBOARD_ADMIN_UID}),vault,sessionSecret=process.env.SESSION_SECRET,encryptionKey=process.env.ENCRYPTION_KEY,secureCookies=process.env.NODE_ENV==='production'}={}) {
+const files=new Map([['/',['index.html','text/html']],['/index.html',['index.html','text/html']],['/vendor/chart.umd.min.js',['vendor/chart.umd.min.js','application/javascript']],['/report-utils.js',['report-utils.js','application/javascript']],['/commercial.js',['commercial.js','application/javascript']],['/metrics.js',['metrics.js','application/javascript']],['/app.js',['app.js','application/javascript']],['/styles.css',['styles.css','text/css']]]);
+export function createApp({lookup=getLaboratories,salesLookup=getSales,intervalMs=3000,firebase=createFirebase({projectId:process.env.FIREBASE_PROJECT_ID,apiKey:process.env.FIREBASE_API_KEY,adminUid:process.env.DASHBOARD_ADMIN_UID,viewerUids:(process.env.DASHBOARD_VIEWER_UIDS||'').split(',').map(v=>v.trim())}),vault,sessionSecret=process.env.SESSION_SECRET,encryptionKey=process.env.ENCRYPTION_KEY,secureCookies=process.env.NODE_ENV==='production'}={}) {
   vault ||= createVault({firebase,encryptionKey});
   const history=createHistory({firebase,encryptionKey});
   let busy=false,nextRequestAt=0;
@@ -64,8 +64,12 @@ export function createApp({lookup=getLaboratories,salesLookup=getSales,intervalM
         throw new AppError('Iniciá sesión en el panel.',401);
       }
       if(session.tokenExpires<=Date.now()+60000){session=await firebase.refresh(session);cookie(session);}
-      if(path==='/api/session')return json(200,{authenticated:true});
-      if(path==='/api/accounts' && req.method==='GET')return json(200,{accounts:await vault.list(session)});
+      session.role=firebase.roleFor?firebase.roleFor(session.uid):(session.role||'admin');
+      session.storageUid=firebase.ownerUid?firebase.ownerUid(session):(session.storageUid||session.uid);
+      if(path==='/api/session')return json(200,{authenticated:true,role:session.role});
+      if(session.role!=='admin'&&!['/api/history','/api/accounts'].includes(path))throw new AppError('Este usuario solo puede consultar el historial.',403);
+      if(session.role!=='admin'&&path==='/api/accounts'&&req.method!=='GET')throw new AppError('Este usuario no puede modificar cuentas.',403);
+      if(path==='/api/accounts' && req.method==='GET')return json(200,{role:session.role,accounts:session.role==='admin'?await vault.list(session):await history.catalog(session)});
       if(path==='/api/import-status'){
         months(body.month+'-01',body.month+'-01');
         return json(200,{ids:(await firebase.listSnapshots(session,body.month)).map(d=>d.id)});

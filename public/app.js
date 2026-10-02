@@ -1,5 +1,5 @@
 const $=id=>document.getElementById(id);
-let accounts=[],laboratories=[],working=false;
+let accounts=[],laboratories=[],working=false,userRole='admin';
 async function api(path,body){
  const response=await fetch(path,{method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),cache:'no-store',signal:AbortSignal.timeout(85000)});
  if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('El servidor no está disponible. Volvé a probar en un momento.');
@@ -8,9 +8,9 @@ async function api(path,body){
 }
 function showAuth(){accounts=[];clearResults();$('account-form').reset();$('account-form').hidden=true;$('dashboard').hidden=true;$('logout').hidden=true;$('auth-panel').hidden=false;$('account-count').textContent='Acceso privado';$('sales-panel').hidden=true;$('sales-output').hidden=true;$('sales-labs').replaceChildren();$('sales-days').replaceChildren();$('open-prices').hidden=true;window.clearMetrics();}
 function clearResults(){laboratories=[];render();$('table').hidden=true;$('search').disabled=true;$('search').value='';$('updated').textContent='';$('count').textContent='Sin consultar';}
-function updateAccounts(selected){$('account').replaceChildren(new Option('Elegir una cuenta',''));for(const a of accounts)$('account').add(new Option(a.name,a.id));$('account').value=selected||'';$('account-count').textContent=`${accounts.length} de 11 cuentas`;controls();}
-function controls(){for(const id of ['sales-account','sales-lab','sales-period','sales-from','sales-to'])$(id).disabled=working||salesRunning;for(const id of ['consult','edit-account'])$(id).disabled=working||salesRunning||!$('account').value;$('new-account').disabled=working||salesRunning||accounts.length>=11;$('save-account').disabled=working||salesRunning;$('account').disabled=working||salesRunning;$('sales-submit').disabled=working||salesRunning;$('import-history').disabled=working||salesRunning;}
-async function loadAccounts(selected){accounts=(await api('/api/accounts')).accounts;updateAccounts(selected);$('auth-panel').hidden=true;$('dashboard').hidden=false;$('logout').hidden=false;$('sales-panel').hidden=false;updateSalesAccounts();$('open-prices').hidden=false;await loadHistory();}
+function updateAccounts(selected){$('account').replaceChildren(new Option('Elegir una cuenta',''));for(const a of accounts)$('account').add(new Option(a.name,a.id));$('account').value=selected||'';$('account-count').textContent=userRole==='admin'?`${accounts.length} de 11 cuentas`:`Solo lectura · ${accounts.length} farmacias`;controls();}
+function controls(){for(const id of ['sales-account','sales-lab','sales-period','sales-from','sales-to','compare-mode','compare-month'])$(id).disabled=working||salesRunning;for(const id of ['consult','edit-account'])$(id).disabled=working||salesRunning||!$('account').value;$('new-account').disabled=working||salesRunning||accounts.length>=11;$('save-account').disabled=working||salesRunning;$('account').disabled=working||salesRunning;$('sales-submit').disabled=working||salesRunning;$('import-history').disabled=working||salesRunning;}
+async function loadAccounts(selected){const data=await api('/api/accounts');accounts=data.accounts;userRole=data.role||'admin';updateAccounts(selected);$('auth-panel').hidden=true;$('dashboard').hidden=userRole!=='admin';$('maintenance').hidden=userRole!=='admin';$('logout').hidden=false;$('sales-panel').hidden=false;updateSalesAccounts();$('open-prices').hidden=false;await loadHistory();}
 function render(){const query=$('search').value.trim().toLocaleLowerCase('es');const filtered=laboratories.filter(l=>`${l.nombre} ${l.codigo}`.toLocaleLowerCase('es').includes(query));$('rows').replaceChildren();for(const lab of filtered){const row=document.createElement('tr');for(const value of [lab.nombre,lab.codigo]){const cell=document.createElement('td');cell.textContent=value;row.append(cell);}const cell=document.createElement('td'),badge=document.createElement('span');badge.className='badge'+(lab.adherido?' yes':'');badge.textContent=lab.adherido?'Adherido':'Sin adherir';cell.append(badge);row.append(cell);$('rows').append(row);}$('count').textContent=`${filtered.length} de ${laboratories.length}`;}
 function display(data){laboratories=data.laboratorios;updateSalesLabs(laboratories);$('search').disabled=false;$('table').hidden=false;render();$('updated').textContent=`Consultado el ${new Date(data.consultadoEn).toLocaleString('es-AR')}`;}
 async function operation(action,message){working=true;controls();clearResults();$('results').setAttribute('aria-busy','true');$('status').className='';$('status').textContent=message;try{await action();}catch(error){$('status').className='error';$('status').textContent=error.name==='TimeoutError'?'La consulta demoró demasiado. Volvé a probar.':error.message;}finally{working=false;controls();$('results').setAttribute('aria-busy','false');}}
@@ -33,13 +33,16 @@ function showSales(results,errors){let units=0,gross=0,refund=0;const daily=new 
 let salesRunning=false;
 async function loadHistory(){
  applyPeriod();
+ window.clearComparison();
+ $('comparison-status').textContent='';
  $('sales-output').hidden=true;
  $('sales-status').textContent='Leyendo el historial guardado…';
  try{
   const data=await api('/api/history',{accountId:$('sales-account').value,laboratorio:$('sales-lab').value,desde:$('sales-from').value,hasta:$('sales-to').value,aggregate:$('sales-period').value==='todos'});
-  if($('dashboard').hidden)return;
+  if($('sales-panel').hidden)return;
   updateSalesLabs(data.laboratorios.map(l=>({codigo:l.laboratorio,nombre:l.nombre})));
   showSales(data.laboratorios,[]);if(!data.snapshots)$('sales-output').hidden=true;
+  await loadComparison();
   $('sales-status').textContent=data.updatedAt?'Historial guardado. Última actualización: '+new Date(data.updatedAt).toLocaleString('es-AR')+'. Datos más antiguos del período: '+new Date(data.oldestUpdate).toLocaleString('es-AR')+'.':'Todavía no hay datos importados para este período. Iniciá la importación.';
  }catch(error){$('sales-status').textContent=error.message;}
 }
@@ -88,3 +91,25 @@ function applyPeriod(){
 $('sales-period').addEventListener('change',applyPeriod);applyPeriod();
 
 for(const id of ['sales-from','sales-to']){$(id).min='2025-01-01';$(id).max=formatLocal(new Date());}
+
+for(const option of $('sales-period').options)if(/^\d{4}-\d{2}$/.test(option.value))$('compare-month').add(new Option(option.text,option.value));
+$('compare-month').value=previousMonth;
+const dateLabel=d=>new Date(d+'T00:00:00Z').toLocaleDateString('es-AR',{timeZone:'UTC'});
+function yearAgo(value){const [year,month,day]=value.split('-').map(Number),last=new Date(Date.UTC(year-1,month,0)).getUTCDate();return (year-1)+'-'+String(month).padStart(2,'0')+'-'+String(Math.min(day,last)).padStart(2,'0');}
+async function loadComparison(){
+ const mode=$('compare-mode').value;if(mode==='none'){$('comparison-status').textContent='Evolución mensual del período seleccionado.';return;}
+ const desde=$('sales-from').value,hasta=$('sales-to').value;
+ let from=yearAgo(desde),to=yearAgo(hasta);
+ if(mode==='month'){from=$('compare-month').value+'-01';const d=new Date(from+'T00:00:00Z');d.setUTCMonth(d.getUTCMonth()+1);d.setUTCDate(0);to=d.toISOString().slice(0,10);if(to>formatLocal(new Date()))to=formatLocal(new Date());}
+ if(from<'2025-01-01'){$('comparison-status').textContent='La referencia incluye fechas anteriores a enero de 2025. No hay historial importado para comparar ese período.';return;}
+ const currentLabel=$('sales-period').value==='personalizado'?dateLabel(desde)+' al '+dateLabel(hasta):$('sales-period').selectedOptions[0].text;
+ const previousLabel=from.slice(0,7)===to.slice(0,7)?periodLabel(from.slice(0,7)):dateLabel(from)+' al '+dateLabel(to);
+ try{const data=await api('/api/history',{accountId:$('sales-account').value,laboratorio:$('sales-lab').value,desde:from,hasta:to,aggregate:true});if($('sales-panel').hidden)return;if(!data.snapshots){$('comparison-status').textContent='No hay historial guardado para '+previousLabel+'.';return;}
+ const fullMonths=desde.endsWith('-01')&&hasta===new Date(Date.UTC(Number(hasta.slice(0,4)),Number(hasta.slice(5,7)),0)).toISOString().slice(0,10)&&from.endsWith('-01')&&to===new Date(Date.UTC(Number(to.slice(0,4)),Number(to.slice(5,7)),0)).toISOString().slice(0,10);
+ const equalDuration=(from.slice(0,7)===to.slice(0,7)&&desde.slice(0,7)===hasta.slice(0,7)&&fullMonths)||(Date.parse(hasta)-Date.parse(desde)===Date.parse(to)-Date.parse(from));
+ $('comparison-status').textContent=currentLabel+' frente a '+previousLabel+'.'+(!equalDuration?' Los períodos tienen distinta duración; sus importes no son directamente equivalentes.':'');
+ window.renderComparison(data.laboratorios,currentLabel,previousLabel,equalDuration);
+ }catch(error){$('comparison-status').textContent='No se pudo cargar la referencia: '+error.message;}
+}
+$('compare-mode').addEventListener('change',()=>{$('compare-month-wrap').hidden=$('compare-mode').value!=='month';if(!salesRunning)$('sales-form').requestSubmit();});
+$('compare-month').addEventListener('change',()=>{if(!salesRunning)$('sales-form').requestSubmit();});

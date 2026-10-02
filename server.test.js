@@ -4,9 +4,26 @@ import {createApp} from './server.js';
 import {createVault} from './lib/vault.js';
 import {seal,unseal} from './lib/security.js';
 import {AppError} from './lib/security.js';
+import {createHistory} from './lib/history.js';
 const key='test-only-encryption-key-1234567890',sessionKey='test-only-session-key-123456789012';
 test('cifrado rechaza alteraciones y contexto incorrecto',()=>{
  const c=seal({password:'password-test-only'},key,'vault');assert.ok(!c.includes('password-test-only'));assert.equal(unseal(c,key,'vault').password,'password-test-only');assert.throws(()=>unseal(c,key,'session'));assert.throws(()=>unseal(c,key+'wrong','vault'));assert.throws(()=>unseal(c.slice(0,-4)+'AAAA',key,'vault'));
+});
+
+test('lector accede al historial del propietario pero no a credenciales ni modificaciones',async()=>{
+ const firebase=storage(),docs=new Map();
+ firebase.roleFor=uid=>uid==='admin'?'admin':'viewer';firebase.ownerUid=()=> 'admin';
+ firebase.login=async()=>({uid:'viewer',idToken:'test-token',refreshToken:'test-refresh',tokenExpires:Date.now()+3600000,sessionExpires:Date.now()+28800000});
+ firebase.writeSnapshot=async(_,month,id,cipher)=>docs.set(month+':'+id,{id,cipher});firebase.listSnapshots=async(_,month)=>[...docs].filter(([k])=>k.startsWith(month+':')).map(([,v])=>v);
+ const currentMonth=new Date().toISOString().slice(0,7);await createHistory({firebase,encryptionKey:key}).save({uid:'admin'},{id:'one',name:'Centro'},{month:currentMonth,desde:currentMonth+'-01',hasta:currentMonth+'-01'},{laboratorio:'5010',nombre:'Lab',movimientos:[],porDia:[],unidades:0,reembolso:0,ventaBruta:0,registros:0});
+ let vaultCalls=0;const vault={list:async()=>{vaultCalls++;throw new Error('No leer credenciales');}};
+ const server=createApp({firebase,vault,encryptionKey:key,sessionSecret:sessionKey,intervalMs:0});await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}`;let cookie='';
+ const post=(path,body)=>fetch(base+path,{method:'POST',headers:{cookie,'Content-Type':'application/json'},body:JSON.stringify(body)});
+ try{const login=await post('/api/login',{email:'reader@example.test',password:'test'});cookie=login.headers.get('set-cookie').split(';')[0];
+  const accounts=await (await fetch(base+'/api/accounts',{headers:{cookie}})).json();assert.equal(accounts.role,'viewer');assert.deepEqual(accounts.accounts,[{id:'one',name:'Centro'}]);assert.equal(vaultCalls,0);
+  for(const route of ['/api/accounts','/api/import','/api/import-status','/api/laboratorios','/api/ventas'])assert.equal((await post(route,{})).status,403,route);
+  const data=await (await post('/api/history',{accountId:'todos',laboratorio:'todos',desde:currentMonth+'-01',hasta:currentMonth+'-01'})).json();assert.equal(data.snapshots,1);
+ }finally{await new Promise(r=>server.close(r));}
 });
 
 test('una importación fallida conserva el mes y el historial se lee sin consultar Avanter',async()=>{
