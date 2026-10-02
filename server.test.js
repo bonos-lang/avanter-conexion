@@ -16,11 +16,12 @@ test('lector accede al historial del propietario pero no a credenciales ni modif
  firebase.login=async()=>({uid:'viewer',idToken:'test-token',refreshToken:'test-refresh',tokenExpires:Date.now()+3600000,sessionExpires:Date.now()+28800000});
  firebase.writeSnapshot=async(_,month,id,cipher)=>docs.set(month+':'+id,{id,cipher});firebase.listSnapshots=async(_,month)=>[...docs].filter(([k])=>k.startsWith(month+':')).map(([,v])=>v);
  const currentMonth=new Date().toISOString().slice(0,7);await createHistory({firebase,encryptionKey:key}).save({uid:'admin'},{id:'one',name:'Centro'},{month:currentMonth,desde:currentMonth+'-01',hasta:currentMonth+'-01'},{laboratorio:'5010',nombre:'Lab',movimientos:[],porDia:[],unidades:0,reembolso:0,ventaBruta:0,registros:0});
+ let chatCalls=0;const chat={configured:()=>true,ask:async(session)=>{assert.equal(session.uid,'viewer');chatCalls++;return {answer:'Prueba',sources:[]};}};
  let vaultCalls=0;const vault={list:async()=>{vaultCalls++;throw new Error('No leer credenciales');}};
- const server=createApp({firebase,vault,encryptionKey:key,sessionSecret:sessionKey,intervalMs:0});await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}`;let cookie='';
+ const server=createApp({firebase,vault,chat,encryptionKey:key,sessionSecret:sessionKey,intervalMs:0});await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}`;let cookie='';
  const post=(path,body)=>fetch(base+path,{method:'POST',headers:{cookie,'Content-Type':'application/json'},body:JSON.stringify(body)});
  try{const login=await post('/api/login',{email:'reader@example.test',password:'test'});cookie=login.headers.get('set-cookie').split(';')[0];
-  const accounts=await (await fetch(base+'/api/accounts',{headers:{cookie}})).json();assert.equal(accounts.role,'viewer');assert.deepEqual(accounts.accounts,[{id:'one',name:'Centro'}]);assert.equal(vaultCalls,0);
+  const accounts=await (await fetch(base+'/api/accounts',{headers:{cookie}})).json();assert.equal(accounts.role,'viewer');assert.deepEqual(accounts.accounts,[{id:'one',name:'Centro'}]);assert.equal(vaultCalls,0);assert.equal((await post('/api/chat',{})).status,200);assert.equal(chatCalls,1);assert.equal((await fetch(base+'/api/chat-status',{headers:{cookie}})).status,200);
   for(const route of ['/api/accounts','/api/import','/api/import-status','/api/laboratorios','/api/ventas'])assert.equal((await post(route,{})).status,403,route);
   const data=await (await post('/api/history',{accountId:'todos',laboratorio:'todos',desde:currentMonth+'-01',hasta:currentMonth+'-01'})).json();assert.equal(data.snapshots,1);
  }finally{await new Promise(r=>server.close(r));}

@@ -1,0 +1,23 @@
+ACTIVAR CHATBOT DE VENTAS
+
+1. Subir el contenido del ZIP al repositorio avanter-conexion, respetando public y lib.
+2. Render > Environment: agregar OPENAI_API_KEY con el valor guardado en .env.local.
+   Copiar solamente el valor, sin OPENAI_API_KEY= ni comillas. No subir .env.local a GitHub.
+3. Opcional: OPENAI_MODEL=gpt-5-mini y CHAT_DAILY_LIMIT=100 (valores predeterminados).
+4. Save, rebuild, and deploy. Ingresar al dashboard y pulsar Asistente de ventas.
+5. Autorizar en la pagina el envio de preguntas y resumenes de ventas a OpenAI.
+6. Probar como administrador y como mrl: resumen, descuentos del 20% y comparacion.
+
+No se necesitan nuevas reglas de Firestore. Los permisos publicados del lector sirven.
+El chat solo consulta el historial; no tiene herramientas para importar o modificar.
+OpenAI recibe preguntas y resumenes comerciales, no contrasenas, tokens ni movimientos
+individuales con datos de pacientes. La API usa el saldo de tu cuenta de OpenAI.
+No se almacena el chat en Firestore ni se comparte la conversacion entre usuarios.
+Memoria temporal de 20 minutos en Render; se pierde al reiniciar. Nueva conversacion
+la reinicia en pantalla. store:false en Responses; no equivale a retencion cero.
+Limites por proceso: 100 preguntas por usuario/dia, 2 consultas concurrentes, hasta 3
+lecturas de periodos por pregunta, hasta 24 meses y 50 grupos por tabla. El contador
+se reinicia al reiniciar Render; no es un limite monetario garantizado.
+Datos faltantes y cobertura diferente se informan. Reembolsos estimados.
+27 pruebas automaticas aprobadas; prueba real de OpenAI solo con datos ficticios.
+Falta verificar produccion despues de subir los archivos y configurar Render.
