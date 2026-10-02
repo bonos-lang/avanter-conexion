@@ -18,16 +18,17 @@ await api('/api/login',{email:process.env.DASHBOARD_EMAIL,password:process.env.D
 const accounts=(await api('/api/accounts')).accounts;
 const now=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Argentina/Buenos_Aires'}).format(new Date());
 const cutoff=new Date(Date.parse(now)-90*86400000).toISOString().slice(0,7);
-let imported=0,failed=0;
+let imported=0,failed=0;const monthStatus=new Map();
 for(const account of accounts){
  await pause(3100);
  let labs;try{labs=(await api('/api/laboratorios',{accountId:account.id})).laboratorios.filter(l=>l.adherido);}catch{failed++;console.log('No se pudo consultar una cuenta; se conservan sus datos.');continue;}
  for(let month='2025-01';month<=now.slice(0,7);){
-  const ids=new Set((await api('/api/import-status',{month})).ids);
+  if(!monthStatus.has(month))monthStatus.set(month,new Set((await api('/api/import-status',{month})).ids));
+  const ids=monthStatus.get(month);
   for(const lab of labs){
    if(month<cutoff&&ids.has(account.id+'_'+lab.codigo))continue;
    await pause(3100);
-   try{await api('/api/import',{accountId:account.id,laboratorio:lab.codigo,month});imported++;}catch{failed++;console.log('Un mes no se pudo importar; se conservan sus datos anteriores.');}
+   try{await api('/api/import',{accountId:account.id,laboratorio:lab.codigo,month});imported++;ids.add(account.id+'_'+lab.codigo);if(imported%25===0)console.log('Progreso: '+imported+' meses guardados; '+failed+' consultas fallidas.');}catch{failed++;console.log('Un mes no se pudo importar; se conservan sus datos anteriores.');}
   }
   const d=new Date(month+'-01T00:00:00Z');d.setUTCMonth(d.getUTCMonth()+1);month=d.toISOString().slice(0,7);
  }

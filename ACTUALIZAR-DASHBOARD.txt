@@ -1,0 +1,36 @@
+ACTUALIZAR EL DASHBOARD
+
+1. Descomprimir el ZIP y subir su contenido a bonos-lang/avanter-conexion,
+   manteniendo las carpetas public, lib y scripts. Subir también server.js,
+   server.test.js, package.json y package-lock.json.
+   Incluir public/vendor: contiene Chart.js 4.5.1 y su licencia.
+
+2. Render > Manual Deploy > Deploy latest commit.
+   Las reglas de Firestore, los secretos de GitHub y las variables de Render
+   existentes siguen sirviendo. No cambiar ENCRYPTION_KEY.
+
+3. Recargar el panel. Seleccionar el mes en Período y pulsar Ver estadísticas.
+   También están Todos los períodos y Rango de fechas personalizado.
+
+La sincronización manual está dentro de Mantenimiento. Se utiliza para
+forzar una carga o recuperar meses pendientes; la tarea diaria sigue activa.
+
+Distribución de descuentos muestra porcentajes exactos, cantidad de
+movimientos, participación por cantidad, importe y participación por importe.
+Cada movimiento es una línea de Avanter, no necesariamente un ticket único.
+
+Los gráficos usan la misma biblioteca del index original, alojada localmente,
+con escalas, leyendas y valores al pasar el cursor.
+
+Todos los períodos y rangos de más de tres meses reciben movimientos
+consolidados por producto y porcentaje dentro de cada mes. Se conservan
+cantidades, totales financieros, número de operaciones y el último precio
+observado; el detalle diario conserva sus totales.
+
+La sincronización lee el estado de cada mes una sola vez por ejecución,
+evitando repetir la lectura del historial por cada farmacia. Publica progreso
+cada 25 meses guardados. La siguiente ejecución de GitHub usa el script nuevo.
+
+La actualización no modifica los documentos cifrados existentes ni requiere
+reimportarlos. Verificada localmente con datos ficticios y pruebas automáticas;
+la pantalla real debe comprobarse después del despliegue.
